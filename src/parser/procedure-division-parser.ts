@@ -5,6 +5,7 @@ import {
   SectionNode,
   ParagraphNode,
 } from '../types';
+import { PerformAnalyzer } from './perform-analyzer';
 
 /**
  * Parser for COBOL PROCEDURE DIVISION structure.
@@ -12,9 +13,11 @@ import {
  */
 export class ProcedureDivisionParser {
   private logger: Logger;
+  private performAnalyzer: PerformAnalyzer;
 
   constructor(logger: Logger) {
     this.logger = logger;
+    this.performAnalyzer = new PerformAnalyzer(logger);
   }
 
   /**
@@ -39,13 +42,18 @@ export class ProcedureDivisionParser {
 
     this.logger.verbose(`Found ${sections.length} sections and ${paragraphs.length} standalone paragraphs`);
 
-    return {
+    const procedureDivision: ProcedureDivisionNode = {
       type: 'PROCEDURE_DIVISION',
       children: [...sections, ...paragraphs],
       sections,
       paragraphs,
       sourceLines: procedureLines,
     };
+
+    // Analyze PERFORM statements and build call relationships
+    this.performAnalyzer.analyzePerformStatements(procedureDivision);
+
+    return procedureDivision;
   }
 
   /**
@@ -97,6 +105,7 @@ export class ProcedureDivisionParser {
       // Check for section declaration
       if (this.isSectionDeclaration(content)) {
         this.logger.verbose(`DEBUG: Found section declaration: ${content}`);
+        
         // Save previous paragraph if any
         if (currentParagraph) {
           this.finalizeParagraph(currentParagraph, currentStructureLines);
@@ -106,12 +115,17 @@ export class ProcedureDivisionParser {
           } else {
             standaloneParagraphs.push(currentParagraph);
           }
-          currentStructureLines = []; // Reset for next structure
+          currentParagraph = null;
+          currentStructureLines = [];
         }
         
-        // Save previous section if any
+        // Save previous section if any (section-level lines are in currentStructureLines)
         if (currentSection) {
-          this.finalizeSection(currentSection, currentStructureLines);
+          // Add any remaining section-level lines before closing the section
+          if (currentStructureLines.length > 0) {
+            currentSection.sourceLines.push(...currentStructureLines);
+            this.logger.verbose(`DEBUG: Added ${currentStructureLines.length} final section-level lines to section ${currentSection.name}`);
+          }
           sections.push(currentSection);
         }
 
@@ -127,7 +141,6 @@ export class ProcedureDivisionParser {
           performs: [],
         };
         
-        currentParagraph = null;
         currentStructureLines = [];
         
         this.logger.verbose(`Found section: ${sectionName}`);
@@ -137,6 +150,7 @@ export class ProcedureDivisionParser {
       // Check for paragraph declaration
       if (this.isParagraphDeclaration(content)) {
         this.logger.verbose(`DEBUG: Found paragraph declaration: ${content}`);
+        
         // Save previous paragraph if any
         if (currentParagraph) {
           this.finalizeParagraph(currentParagraph, currentStructureLines);
@@ -146,6 +160,10 @@ export class ProcedureDivisionParser {
           } else {
             standaloneParagraphs.push(currentParagraph);
           }
+        } else if (currentSection && currentStructureLines.length > 0) {
+          // If we're in a section with no current paragraph, these are section-level lines
+          currentSection.sourceLines.push(...currentStructureLines);
+          this.logger.verbose(`DEBUG: Added ${currentStructureLines.length} section-level lines to section ${currentSection.name}`);
         }
 
         // Start new paragraph
@@ -178,11 +196,13 @@ export class ProcedureDivisionParser {
       } else {
         standaloneParagraphs.push(currentParagraph);
       }
+    } else if (currentSection && currentStructureLines.length > 0) {
+      // If we're in a section with no current paragraph, add remaining lines to the section
+      currentSection.sourceLines.push(...currentStructureLines);
+      this.logger.verbose(`DEBUG: Added ${currentStructureLines.length} final section-level lines to section ${currentSection.name}`);
     }
     
     if (currentSection) {
-      // Add any remaining lines to the current section and save it
-      this.finalizeSection(currentSection, currentStructureLines);
       sections.push(currentSection);
     }
 
@@ -217,9 +237,23 @@ export class ProcedureDivisionParser {
       return false;
     }
     
-    // Paragraph declaration: "PARAGRAPH-NAME."
-    // Must start in area A and end with a period
-    return /^[A-Z][A-Z0-9-]*\s*\.$/.test(trimmed);
+    // Check if it matches paragraph pattern
+    const match = trimmed.match(/^([A-Z][A-Z0-9-]*)\s*\.$/);
+    if (!match) {
+      return false;
+    }
+    
+    const name = match[1];
+    
+    // Exclude COBOL reserved words and common statements that end with periods
+    const reservedWords = [
+      'END-IF', 'END-ELSE', 'END-PERFORM', 'END-READ', 'END-WRITE', 'END-REWRITE',
+      'END-DELETE', 'END-START', 'END-ACCEPT', 'END-DISPLAY', 'END-CALL',
+      'END-EVALUATE', 'END-SEARCH', 'END-STRING', 'END-UNSTRING', 'END-COMPUTE',
+      'CONTINUE', 'EXIT', 'GOBACK', 'STOP', 'NEXT', 'ELSE'
+    ];
+    
+    return !reservedWords.includes(name);
   }
 
   /**
@@ -246,15 +280,6 @@ export class ProcedureDivisionParser {
   private finalizeParagraph(paragraph: ParagraphNode, lines: ProcessedLine[]): void {
     paragraph.sourceLines.push(...lines);
   }
-
-  /**
-   * Finalize a section by adding remaining lines
-   */
-  private finalizeSection(section: SectionNode, lines: ProcessedLine[]): void {
-    section.sourceLines.push(...lines);
-  }
-
-
 
   /**
    * Validate the parsed structure for correctness
@@ -312,5 +337,26 @@ export class ProcedureDivisionParser {
     }
 
     return errors;
+  }
+
+  /**
+   * Validate PERFORM targets in the parsed structure
+   */
+  public validatePerformTargets(procedureDivision: ProcedureDivisionNode): string[] {
+    return this.performAnalyzer.validatePerformTargets(procedureDivision);
+  }
+
+  /**
+   * Generate a call graph report for the PROCEDURE DIVISION
+   */
+  public generateCallGraphReport(procedureDivision: ProcedureDivisionNode): string {
+    return this.performAnalyzer.generateCallGraphReport(procedureDivision);
+  }
+
+  /**
+   * Get the symbol table from the PERFORM analyzer (for testing/debugging)
+   */
+  public getSymbolTable(): Map<string, SectionNode | ParagraphNode> {
+    return this.performAnalyzer.getSymbolTable();
   }
 }

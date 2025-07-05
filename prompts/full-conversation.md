@@ -1160,3 +1160,157 @@ Key highlights of the plan:
 The plan emphasizes test-driven development with real COBOL code samples and includes comprehensive error handling strategies. It's designed to be maintainable and extensible for future enhancements like DATA DIVISION support.
 
 Would you like me to elaborate on any specific phase or aspect of the implementation plan?
+
+EnricoPicci: I have updated the requirements in the README.md file, adding a section about how to deal with the Cobol COPY statements. 
+
+GitHub Copilot: I can see the updated requirements in the README.md file. The addition of COPY statement handling significantly changes the complexity and design of the parser. Let me update the implementation plan to incorporate these new requirements. 
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+I've successfully updated the implementation plan to incorporate the new COPY statement requirements. Here are the key changes made:
+
+## Major Additions to the Plan:
+
+### 1. **New Core Component: COPY Resolution System**
+- Added `CopyResolver` class as a major component
+- Dedicated phase (Phase 2) for COPY statement handling
+- Support for recursive file inclusion with circular dependency detection
+
+### 2. **Enhanced AST Structure with Source Line Tracking**
+- Implemented the suggested approach of modeling each line as an AST node
+- Added `SourceLineNode` interface with file attribution
+- Enhanced all AST nodes to track source file origins
+- Added `PerformReference` with cross-file context
+
+### 3. **Cross-File Functionality**
+- Enhanced all parsing phases to handle multi-file scenarios
+- PERFORM analysis across file boundaries
+- Symbol resolution across included files
+- Source line attribution throughout the process
+
+### 4. **Expanded File Structure**
+- New `/copy` directory for COPY-related functionality
+- Enhanced test structure with complex multi-file scenarios
+- Additional documentation for COPY handling
+
+### 5. **Comprehensive Testing Strategy**
+- Deep nesting scenarios (3-4 levels of COPY inclusion)
+- Circular dependency detection testing
+- Cross-file PERFORM reference validation
+- Performance testing with large COPYBOOK libraries
+
+### 6. **Updated Duration and Complexity**
+- Increased from 17-24 days to **26-32 days** due to COPY complexity
+- More detailed phases with COPY-specific considerations
+- Enhanced error handling and validation requirements
+
+## Key Technical Features Added:
+
+- **Recursive COPY Resolution**: Handle nested COPY statements
+- **Source File Tracking**: Every line knows its origin file
+- **Circular Dependency Detection**: Prevent infinite inclusion loops
+- **Cross-File Name Resolution**: PERFORM targets in any included file
+- **Path Resolution**: Standard COPYBOOK library support
+- **Enhanced Error Context**: File inclusion chain in error messages
+
+The plan now comprehensively addresses the COPY requirements while maintaining the original PROCEDURE DIVISION parsing goals. The source line tracking using AST nodes provides the flexibility you requested for maintaining file origin information throughout the parsing process.

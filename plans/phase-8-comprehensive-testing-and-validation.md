@@ -10,7 +10,8 @@ This final phase creates extensive test suites for all parser functionality, val
 4. Create test COBOL programs with complex COPYBOOK structures
 5. Validate against real-world COBOL code patterns
 6. Implement error handling validation
-7. Create documentation and usage examples
+7. Create optional smoke tests for private real-world COBOL files
+8. Create documentation and usage examples
 
 ## Test Categories
 
@@ -34,6 +35,88 @@ This final phase creates extensive test suites for all parser functionality, val
 - **Memory Usage**: Validate memory efficiency with large hierarchies
 - **Processing Speed**: Ensure reasonable performance on typical files
 
+### Real-World Smoke Tests (Optional)
+
+#### Overview
+Additional validation using private COBOL files from the `test-data-real/cobol/` directory. These tests provide extra confidence with actual production COBOL code but are optional and non-blocking.
+
+#### Implementation Logic
+```typescript
+// Example test structure
+describe('Real-World Smoke Tests', () => {
+  const realDataPath = path.join(__dirname, '../test-data-real/cobol');
+  
+  beforeAll(() => {
+    // Check if test-data-real/cobol directory exists and has files
+    if (!fs.existsSync(realDataPath)) {
+      console.log('Skipping real-world smoke tests: test-data-real/cobol directory not found');
+      return;
+    }
+    
+    const cobolFiles = fs.readdirSync(realDataPath)
+      .filter(file => file.endsWith('.cbl') || file.endsWith('.cob'));
+    
+    if (cobolFiles.length === 0) {
+      console.log('Skipping real-world smoke tests: no COBOL files found in test-data-real/cobol');
+      return;
+    }
+  });
+  
+  // Conditional test execution
+  test.each(getAvailableCobolFiles())('should parse real COBOL file: %s', (filename) => {
+    // Parse and validate each available file
+  });
+});
+```
+
+#### Test Characteristics
+- **Conditional Execution**: Only run if `test-data-real/cobol/` exists and contains COBOL files
+- **Non-Blocking**: Failures don't affect main test suite success
+- **Additional Coverage**: Supplement, don't replace, synthetic test cases
+- **Privacy Aware**: Files are not committed to git (.gitignore exclusion)
+- **Flexible**: Adapt to whatever files are available
+
+#### Test Implementation
+1. **Directory Check**: Verify `test-data-real/cobol/` directory exists
+2. **File Discovery**: Scan for `.cbl` and `.cob` files
+3. **Dynamic Test Generation**: Create tests for each available file
+4. **Graceful Skipping**: Skip entire suite if no files available
+5. **Error Reporting**: Report failures separately from main test suite
+
+#### Test Coverage Areas
+- **Real Syntax Patterns**: Actual COBOL coding styles and conventions
+- **Production COPYBOOK Usage**: Real-world COPY statement patterns
+- **Complex Structures**: Large programs with multiple sections/paragraphs
+- **Performance Validation**: Test with actual file sizes and complexity
+- **Error Handling**: Validate graceful handling of unexpected patterns
+
+#### Configuration
+```json
+// package.json test scripts
+{
+  "scripts": {
+    "test": "jest --testPathIgnorePatterns=smoke",
+    "test:all": "jest",
+    "test:smoke": "jest tests/smoke/",
+    "test:with-real": "jest --testNamePattern='Real-World'"
+  }
+}
+```
+
+#### Benefits
+- **Real-World Confidence**: Validation with actual production code
+- **Edge Case Discovery**: Find patterns not covered by synthetic tests
+- **Performance Reality Check**: Test with real file sizes and complexity
+- **Regression Prevention**: Catch issues with actual COBOL variations
+- **Optional Enhancement**: Extra validation without blocking development
+
+#### Git Configuration
+Ensure `.gitignore` includes:
+```
+# Private test data - not committed
+test-data-real/
+```
+
 ## Test Data Structure
 ```
 tests/
@@ -53,6 +136,8 @@ tests/
 │   ├── large-files.test.ts
 │   ├── deep-nesting.test.ts
 │   └── memory-usage.test.ts
+├── smoke/
+│   └── real-world-smoke.test.ts  # Optional tests for private COBOL files
 ├── fixtures/
 │   ├── simple/
 │   │   ├── main.cbl
@@ -90,6 +175,14 @@ tests/
     ├── sample-program1/
     ├── sample-program2/
     └── sample-program3/
+
+test-data-real/  # NOT committed to git
+└── cobol/       # Private COBOL files for optional smoke tests
+    ├── program1.cbl
+    ├── program2.cbl
+    └── copybooks/
+        ├── copy1.cpy
+        └── copy2.cpy
 ```
 
 ## Complex Test Scenarios
@@ -157,8 +250,12 @@ tests/
 
 ## Acceptance Criteria
 - Comprehensive test coverage (95%+) for all components
-- All test scenarios pass consistently
+- All required test scenarios pass consistently
 - Performance benchmarks met for all target scenarios
+- Real-world COBOL programs parse successfully (when available)
+- Optional smoke tests execute conditionally without blocking main test suite
+- Error handling provides meaningful, actionable feedback
+- Documentation complete and accurate
 - Real-world COBOL programs parse successfully
 - Error handling provides meaningful, actionable feedback
 - Documentation complete and accurate
@@ -171,7 +268,8 @@ tests/
 
 ## Final Deliverables
 - Production-ready COBOL parser with full COPY support
-- Comprehensive test suite with high coverage
+- Comprehensive test suite with high coverage including optional real-world validation
 - Performance validation and optimization
 - Complete documentation and examples
 - Ready for real-world COBOL program processing
+- Flexible testing framework that adapts to available private test data

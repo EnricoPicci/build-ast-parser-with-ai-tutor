@@ -7,17 +7,19 @@ This phase focuses exclusively on setting up the foundational TypeScript project
 1. Initialize TypeScript Node.js project with package.json
 2. Set up development tooling (ESLint, Prettier, Jest for testing)
 3. Create basic project directory structure
-4. Implement CLI argument handling for file path input
-5. Create basic file I/O operations for reading COBOL files
-6. Set up basic error handling and logging framework
-7. Create entry point (index.ts) with command-line interface
-8. Set up build and development scripts
+4. Configure .gitignore to exclude private test data (test-data-real/ folder)
+5. Implement CLI argument handling for file path input
+6. Create basic file I/O operations for reading COBOL files
+7. Set up basic error handling and logging framework
+8. Create entry point (index.ts) with command-line interface
+9. Set up build and development scripts
 
 ## Deliverables
 - Complete TypeScript project setup with proper configuration
 - Working CLI that accepts COBOL file path as argument
 - Basic file reading capabilities with error handling
-- Project structure with organized directories (src/, tests/, etc.)
+- Project structure with organized directories (src/, tests/, test-data-real/)
+- .gitignore configured to exclude private test data
 - Development tooling configured and working
 - Basic unit test framework established
 

@@ -233,15 +233,22 @@ export class LineProcessor {
       case undefined:
         // Regular code line
         base.lineType = 'CODE';
-        // Combine areas properly - if Area A doesn't end with whitespace/punctuation,
-        // concatenate directly (word spans boundary), otherwise add space
+        // Combine areas properly
         let content = areaA.trimEnd();
         const areaBTrimmed = areaB.trimStart();
         
         if (content.length > 0 && areaBTrimmed.length > 0) {
-          // Check if Area A ends with a complete word (ends with space or punctuation)
-          if (/[\s\-.]$/.test(areaA)) {
+          // Check if this looks like a paragraph/section name that was split
+          const combinedName = content + areaBTrimmed;
+          if (/^[A-Z][A-Z0-9-]*\s*(SECTION\s*)?\.$/.test(combinedName.toUpperCase())) {
+            // This is a paragraph or section name, combine without space
+            content = combinedName;
+          } else if (/[\s.]$/.test(areaA)) {
+            // Area A ends with whitespace or period, add space
             content += ' ' + areaBTrimmed;
+          } else if (areaA.endsWith('-') && /^[A-Z]/.test(areaBTrimmed)) {
+            // Hyphenated name continues, don't add space
+            content += areaBTrimmed;
           } else {
             // Word continues from Area A to Area B
             content += areaBTrimmed;

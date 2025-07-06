@@ -2,7 +2,7 @@
 
 import { parseCliArgs, validateCliArgs } from './cli/args';
 import { Logger, FileHandler } from './utils';
-import { ParseResult } from './types';
+import { ASTBuilder } from './parser/ast-builder';
 
 /**
  * Main entry point for the COBOL AST Parser
@@ -29,47 +29,104 @@ async function main(): Promise<void> {
       logger.verbose(`Output file: ${args.output}`);
     }
 
-    // Initialize file handler
-    const fileHandler = new FileHandler(logger);
+    // Initialize AST Builder
+    const astBuilder = new ASTBuilder(logger);
 
-    // Read and process the COBOL file
-    const result = await processCobolFile(args.file, fileHandler, logger);
+    // Build AST from COBOL file
+    const result = await astBuilder.buildAST(args.file);
 
-    // Output results
-    if (result.success) {
-      logger.success(`Successfully processed COBOL file: ${args.file}`);
-      if (result.fileSize) {
-        logger.info(`File size: ${result.fileSize} bytes`);
+    // Handle results
+    if (result.success && result.ast) {
+      logger.success(`Successfully built AST for: ${args.file}`);
+      
+      // Log statistics
+      if (result.stats) {
+        const stats = result.stats;
+        logger.info(`Processing completed in ${stats.processingTime}ms`);
+        logger.info(`Total lines: ${stats.totalLines}`);
+        logger.info(`Procedure division lines: ${stats.procedureLines}`);
+        logger.info(`Sections: ${stats.sectionCount}, Paragraphs: ${stats.paragraphCount}`);
+        logger.info(`PERFORM statements: ${stats.performCount}`);
+        
+        if (stats.errorCount > 0) {
+          logger.warn(`Validation errors: ${stats.errorCount}`);
+        }
+        if (stats.warningCount > 0) {
+          logger.warn(`Validation warnings: ${stats.warningCount}`);
+        }
       }
-      if (result.lineCount) {
-        logger.info(`Lines processed: ${result.lineCount}`);
+
+      // Determine output file path
+      const outputPath = args.output || astBuilder.generateOutputFilename(args.file);
+      
+      // Save AST to file
+      await astBuilder.saveASTToFile(
+        result.ast,
+        outputPath,
+        true, // Include validation info
+        result.validationIssues,
+        result.stats
+      );
+      
+      logger.success(`AST saved to: ${outputPath}`);
+
+      // Display validation issues if any
+      if (result.validationIssues && result.validationIssues.length > 0) {
+        logger.info('\nValidation Issues:');
+        for (const issue of result.validationIssues) {
+          const prefix = issue.type === 'ERROR' ? 'ERROR' : 'WARN';
+          const location = issue.lineNumber ? ` (line ${issue.lineNumber})` : '';
+          logger.info(`  ${prefix}: ${issue.message}${location}`);
+        }
       }
 
-      // For now, just output a basic success message
-      // In future phases, this will output the actual AST
-      const output = {
-        success: true,
-        file: result.filePath,
-        message: 'File successfully read and validated',
-        stats: {
-          size: result.fileSize,
-          lines: result.lineCount,
-        },
-      };
+      // If output to stdout was requested and no output file specified
+      if (!args.output) {
+        // Only show summary to stdout since we already saved to file
+        const summary = {
+          success: true,
+          file: args.file,
+          outputFile: outputPath,
+          summary: {
+            sections: result.stats?.sectionCount || 0,
+            paragraphs: result.stats?.paragraphCount || 0,
+            performStatements: result.stats?.performCount || 0,
+            validationErrors: result.stats?.errorCount || 0,
+            validationWarnings: result.stats?.warningCount || 0,
+          },
+        };
 
-      const outputStr =
-        args.format === 'yaml'
-          ? formatAsYaml(output)
-          : JSON.stringify(output, null, 2);
-
-      if (args.output) {
-        await fileHandler.writeFile(args.output, outputStr);
-        logger.success(`Results written to: ${args.output}`);
-      } else {
+        const outputStr = args.format === 'yaml'
+          ? formatAsYaml(summary)
+          : JSON.stringify(summary, null, 2);
+        
         console.log(outputStr);
       }
     } else {
-      logger.error(`Failed to process COBOL file: ${result.error}`);
+      logger.error(`Failed to build AST: ${result.error}`);
+      
+      // Still try to save partial results if we have statistics
+      if (result.stats) {
+        const errorSummary = {
+          success: false,
+          file: args.file,
+          error: result.error,
+          stats: result.stats,
+        };
+        
+        const outputStr = args.format === 'yaml'
+          ? formatAsYaml(errorSummary)
+          : JSON.stringify(errorSummary, null, 2);
+          
+        if (args.output) {
+          const fileHandler = new FileHandler(logger);
+          await fileHandler.writeFile(args.output, outputStr);
+          logger.info(`Error report written to: ${args.output}`);
+        } else {
+          console.log(outputStr);
+        }
+      }
+      
       process.exit(1);
     }
   } catch (error) {
@@ -78,40 +135,6 @@ async function main(): Promise<void> {
       `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
     process.exit(1);
-  }
-}
-
-/**
- * Process a COBOL file
- */
-async function processCobolFile(
-  filePath: string,
-  fileHandler: FileHandler,
-  logger: Logger
-): Promise<ParseResult> {
-  try {
-    // Read the file
-    const content = await fileHandler.readCobolFile(filePath);
-
-    // Get file statistics
-    const stats = await fileHandler.getFileStats(filePath);
-
-    logger.verbose(
-      `File content preview (first 100 chars): ${content.substring(0, 100)}...`
-    );
-
-    return {
-      success: true,
-      filePath: filePath,
-      fileSize: stats.size,
-      lineCount: stats.lines,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      filePath: filePath,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
   }
 }
 

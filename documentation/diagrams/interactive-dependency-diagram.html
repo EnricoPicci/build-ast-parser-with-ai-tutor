@@ -156,6 +156,10 @@
                 Entry Point
             </div>
             <div class="legend-item">
+                <div class="legend-color" style="background-color: #7b1fa2;"></div>
+                CLI
+            </div>
+            <div class="legend-item">
                 <div class="legend-color" style="background-color: #1976d2;"></div>
                 Utils
             </div>
@@ -237,14 +241,13 @@
             { source: 'utils/file-handler.ts', target: 'path', external: true }
         ];
 
-        // Define dependency layers for hierarchical layout
+        // Define dependency layers for hierarchical layout (matching mermaid diagram exactly)
         const layers = {
-            0: ['index.ts'], // Entry point
-            1: ['cli/args.ts', 'utils/index.ts'], // Direct dependencies of entry point
-            2: ['types/index.ts', 'utils/logger.ts', 'utils/file-handler.ts', 'utils/cobol-utils.ts', 'utils/cobol-format-detector.ts'], // Utils and types
-            3: ['parser/line-processor.ts', 'parser/perform-analyzer.ts'], // Parser modules
-            4: ['parser/procedure-division-parser.ts'], // Higher level parser
-            5: ['yargs', 'yargs/helpers', 'fs', 'path'] // External dependencies
+            0: ['index.ts'], // Entry point (A)
+            1: ['cli/args.ts', 'utils/index.ts', 'types/index.ts'], // Direct dependencies (B, C, D)
+            2: ['utils/logger.ts', 'utils/file-handler.ts', 'utils/cobol-utils.ts', 'utils/cobol-format-detector.ts'], // Utils modules (E, F, G, H)
+            3: ['parser/line-processor.ts', 'parser/perform-analyzer.ts', 'parser/procedure-division-parser.ts'], // All Parser modules (I, J, K)
+            4: ['yargs', 'yargs/helpers', 'fs', 'path'] // External dependencies (L, M, N, O)
         };
 
         // Check for bidirectional dependencies
@@ -352,49 +355,72 @@
             .attr('fill', '#ff4444')
             .attr('stroke', '#ff4444');
 
-        // Set initial positions based on layers
+        // Set initial positions based on layers (exactly matching mermaid TD layout)
         function setInitialPositions() {
-            const layerHeight = 120;
-            const startY = 80;
+            const layerHeight = 100; // Spacing between layers
+            const startY = 60;
             
             Object.keys(layers).forEach(layerIndex => {
                 const layerNodes = layers[layerIndex];
                 const y = startY + parseInt(layerIndex) * layerHeight;
-                const nodeWidth = width / (layerNodes.length + 1);
                 
-                layerNodes.forEach((nodeId, index) => {
-                    const node = nodes.find(n => n.id === nodeId);
+                if (layerIndex === '0') {
+                    // Entry point - center top
+                    const node = nodes.find(n => n.id === 'index.ts');
                     if (node) {
-                        node.x = nodeWidth * (index + 1);
+                        node.x = width / 2;
                         node.y = y;
-                        node.fx = node.x; // Fix position initially
+                        node.fx = node.x;
                         node.fy = node.y;
                     }
-                });
+                } else {
+                    // All other layers - spread evenly across width with proper margins
+                    const margin = 150; // Margin from edges
+                    const availableWidth = width - (2 * margin);
+                    const nodeSpacing = availableWidth / (layerNodes.length - 1 || 1);
+                    
+                    layerNodes.forEach((nodeId, index) => {
+                        const node = nodes.find(n => n.id === nodeId);
+                        if (node) {
+                            if (layerNodes.length === 1) {
+                                node.x = width / 2;
+                            } else {
+                                node.x = margin + (index * nodeSpacing);
+                            }
+                            node.y = y;
+                            node.fx = node.x;
+                            node.fy = node.y;
+                        }
+                    });
+                }
             });
         }
 
-        // Create force simulation with hierarchical positioning
+        // Create force simulation with strong hierarchical positioning
         const simulation = d3.forceSimulation(nodes)
-            .force('link', d3.forceLink(links).id(d => d.id).distance(100).strength(0.1))
-            .force('charge', d3.forceManyBody().strength(-100))
-            .force('collision', d3.forceCollide().radius(70))
+            .force('link', d3.forceLink(links).id(d => d.id).distance(60).strength(0.05))
+            .force('charge', d3.forceManyBody().strength(-50))
+            .force('collision', d3.forceCollide().radius(40))
             .force('y', d3.forceY().y(d => {
-                // Find which layer this node belongs to
+                // Find which layer this node belongs to and force strong Y positioning
                 for (let layerIndex in layers) {
                     if (layers[layerIndex].includes(d.id)) {
-                        return 80 + parseInt(layerIndex) * 120;
+                        return 60 + parseInt(layerIndex) * 100;
                     }
                 }
                 return height / 2;
-            }).strength(0.8))
-            .alphaDecay(0.05)
-            .velocityDecay(0.3);
+            }).strength(2.0)) // Very strong Y force to maintain layers
+            .force('x', d3.forceX().x(d => {
+                // Maintain X positions as set initially
+                return d.fx || width / 2;
+            }).strength(0.1))
+            .alphaDecay(0.01)
+            .velocityDecay(0.1);
 
         // Set initial positions
         setInitialPositions();
 
-        // Stop simulation after initial positioning
+        // Let simulation run very briefly then stop to maintain clean layout
         setTimeout(() => {
             simulation.stop();
         }, 100);
@@ -549,7 +575,7 @@
             simulation.alpha(0.1).restart();
             setTimeout(() => {
                 simulation.stop();
-            }, 500);
+            }, 200);
         }
 
         function centerView() {
@@ -568,11 +594,15 @@
             svg.transition().duration(750).call(zoom.transform, transform);
         }
 
-        // Initial setup - no animation
+        // Initial setup - position nodes immediately and then fit to screen
+        setInitialPositions();
+        updateLinkPositions();
+        node.attr('transform', d => `translate(${d.x},${d.y})`);
+        
         setTimeout(() => {
             updateLinkPositions();
             fitToScreen();
-        }, 200);
+        }, 100);
     </script>
 </body>
 </html>
